@@ -9,13 +9,13 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 
 add_executable(single single.cpp)
 
-add_executable(static parallel.cpp)
+add_executable(static individual.cpp)
 
-add_executable(dynamic parallel.cpp)
+add_executable(dynamic individual.cpp)
 target_compile_definitions(dynamic PRIVATE SCHEDULE_DYNAMIC)
 
-add_executable(guided parallel.cpp)
+add_executable(guided individual.cpp)
 target_compile_definitions(guided PRIVATE SCHEDULE_GUIDED)
 
-add_executable(auto parallel.cpp)
+add_executable(auto individual.cpp)
 target_compile_definitions(auto PRIVATE SCHEDULE_AUTO)
