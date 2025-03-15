@@ -79,11 +79,24 @@ int main(int argc, char **argv) {
     double tau = std::stod(argv[2]);
     threads = atoi(argv[3]);
 
-    std::vector<double> A(N * N, 1);
-#pragma omp parallel for num_threads(threads)
+    std::vector<double> A;
+    A.reserve(N * N);
+    #pragma omp parallel
+    {
+        std::vector<double> local_A;
+        local_A.reserve(N * N);
+    
+        #pragma omp for
+        for (int i = 0; i < N * N; ++i)
+            local_A.push_back(1);
+    
+        #pragma omp critical
+        A.insert(A.end(), local_A.begin(), local_A.end());
+    }
+    #pragma omp parallel for num_threads(threads)
     for (int i = 0; i < N; ++i)
         A[i * N + i] = 2;
-
+    
     const std::vector<double> b(N, N + 1);
     std::vector<double> X(N, 0);
 
