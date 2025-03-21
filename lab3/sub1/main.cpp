@@ -1,4 +1,5 @@
 #include <iostream>
+#include <boost/program_options.hpp>
 #include <thread>
 #include <vector>
 #include <algorithm>
@@ -49,15 +50,27 @@ std::chrono::duration<double> Multiplication(int N, int threadAmount) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3)
+    try {
+        boost::program_options::options_description desc("Allowed options");
+        desc.add_options()
+            ("size,N", boost::program_options::value<int>()->required(), "Matrix size")
+            ("threads,T", boost::program_options::value<int>()->required(), "Number of threads");
+        
+        boost::program_options::variables_map vm;
+        boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
+        
+        boost::program_options::notify(vm);
+        
+        int N = vm["size"].as<int>();
+        int threadAmount = vm["threads"].as<int>();
+        
+        auto duration = Multiplication(N, threadAmount);
+        
+        std::cout << std::fixed << duration.count() << std::endl;
+    } catch (const boost::program_options::error &e) {
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
-
-    int N = atoi(argv[1]);
-    int threadAmount = atoi(argv[2]);
-
-    auto duration = Multiplication(N, threadAmount);
-
-    std::cout << std::fixed << duration.count() << std::endl;
-
+    }
+    
     return 0;
 }
