@@ -15,6 +15,21 @@ logging.basicConfig(level=logging.INFO,
                         datefmt='%d-%m-%y %H:%M:%S',
                         filename='logs/log.txt')
 
+cv2.setLogLevel(0)
+open("logs/log.txt", "w").close()
+
+
+def list_cameras(max_cameras=10):
+    available_cameras = []
+
+    for index in range(max_cameras):
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            if cap.read()[0]:
+                available_cameras.append(str(index))
+            cap.release()
+
+    return available_cameras
 
 def parse():
     logger.info("Parsing arguments")
@@ -24,8 +39,28 @@ def parse():
     parser.add_argument("resolution")
     parser.add_argument("framerate")
 
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except SystemExit as e:
+        logger.fatal("Error parsing arguments")
+        exit(1)
+
     width, height = args.resolution.split('x')
+
+    if args.camera_name not in list_cameras():
+        logger.fatal("Camera not found")
+        logger.fatal("Fatal error")
+        exit(1)
+
+    if int(width) <= 0 or int(height) <= 0:
+        logger.fatal("Width and/or height must be positive")
+        logger.fatal("Fatal error")
+        exit(1)
+
+    if float(args.framerate) <= 0:
+        logger.fatal("Framerate must be positive")
+        logger.fatal("Fatal error")
+        exit(1)
 
     return args.camera_name, int(width), int(height), float(args.framerate)
 
@@ -55,7 +90,7 @@ class SensorX(Sensor):
 
 class SensorCam(Sensor):
     def __init__(self, name: string, width: int, height: int):
-        self._name = name
+        self._name = int(name)
         self._width = width
         self._height = height
         self._camera = cv2.VideoCapture(self._name)
@@ -101,7 +136,6 @@ class WindowImage:
 
     def __del__(self):
         cv2.destroyWindow("Image")
-        logger.info("Window destroyed")
 
 
 class ImageProcessor:
@@ -185,4 +219,5 @@ if __name__ == "__main__":
             sensor2_thread.join()
             sensor_cam_thread.join()
 
+            logger.info("Window destroy")
             exit(0)
