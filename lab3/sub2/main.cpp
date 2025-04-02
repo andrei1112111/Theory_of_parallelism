@@ -86,68 +86,52 @@ template<typename T>
 class Server {
 private:
     std::mutex queueMutex;
-    std::mutex pauseMutex;
     std::queue<std::tuple<Task, T, T>> taskQueue;
-    size_t taskId;
     std::vector<std::tuple<std::string, T, T, T>> results;
     std::jthread serverThread;
     std::condition_variable cv;
 
+    std::unordered_map<Task, std::function<T(T, T)>> funcMap{
+        {Sin, fun_sin<T>},
+        {Sqrt, fun_sqrt<T>},
+        {Pow, fun_pow<T>}
+    };
+
+    std::unordered_map<Task, std::string> taskNames{
+        {Sin, "Sin"},
+        {Sqrt, "Sqrt"},
+        {Pow, "Pow"}
+    };
+
     void Work(const std::stop_token &stopToken) {
         while (!stopToken.stop_requested()) {
-            if (taskQueue.empty()) {
-                std::unique_lock lck(queueMutex);
-                cv.wait(lck);
-            }
-            std::unique_lock lck(queueMutex);
-            std::tuple<Task, T, T> task(taskQueue.front());
-            lck.unlock();
-            T x = get<1>(task);
-            T y = get<2>(task);
-            switch (get<0>(task)) {
-                case Sin:
-                    results.emplace_back("Sin", fun_sin(x, y), x, y);
-                    break;
-                case Sqrt:
-                    results.emplace_back("Sqrt", fun_sqrt(x, y), x, y);
-                    break;
-                case Pow:
-                    results.emplace_back("Pow", fun_pow(x, y), x, y);
-                    break;
-            }
-            std::lock_guard guard(queueMutex);
+            std::unique_lock lock(queueMutex);
+            cv.wait(lock, [this] { return !taskQueue.empty(); });
+
+            auto [taskType, x, y] = taskQueue.front();
             taskQueue.pop();
+            lock.unlock();
+
+            T result = funcMap[taskType](x, y);
+            results.emplace_back(taskNames[taskType], result, x, y);
         }
     }
 
 public:
-    Server() :
-            taskId{},
-            serverThread{} {}
+    Server() : serverThread{} {}
 
     void Start() {
-    serverThread = std::jthread([this](std::stop_token stopToken) {
-        Work(stopToken);
-    });
-}
-
-    void Stop() {
-        serverThread.request_stop();
+        serverThread = std::jthread([this](std::stop_token stopToken) { Work(stopToken); });
     }
 
-    void Join() {
-        serverThread.join();
-    }
+    void Stop() { serverThread.request_stop(); }
 
-    size_t AddTask(Task taskType, T x, T y) {
-        std::lock_guard guard(queueMutex);
+    void Join() { serverThread.join(); }
+
+    void AddTask(Task taskType, T x, T y) {
+        std::lock_guard lock(queueMutex);
         taskQueue.emplace(taskType, x, y);
         cv.notify_one();
-        return taskId++;
-    }
-
-    T RequestResult(size_t id) {
-        return results[id];
     }
 
     std::vector<std::tuple<std::string, T, T, T>> GetResult() {
@@ -155,13 +139,10 @@ public:
     }
 };
 
-
 template<typename T>
 class Client {
 public:
-    Client(Server<T> &server, Task taskType) :
-            server((Server<T> &) server),
-            taskType(taskType) {}
+    Client(Server<T> &server, Task taskType) : server(server), taskType(taskType) {}
 
     void Start(int N) {
         thread = std::thread([N, this] {
@@ -170,9 +151,7 @@ public:
         });
     }
 
-    void Join() {
-        thread.join();
-    }
+    void Join() { thread.join(); }
 
 private:
     Server<T> &server;
