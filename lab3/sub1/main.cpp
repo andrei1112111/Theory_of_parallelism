@@ -53,20 +53,31 @@ int main(int argc, char **argv) {
     try {
         boost::program_options::options_description desc("Allowed options");
         desc.add_options()
+            ("help,h", "Show help message")
             ("size,N", boost::program_options::value<int>()->required(), "Matrix size")
             ("threads,T", boost::program_options::value<int>()->required(), "Number of threads");
         
         boost::program_options::variables_map vm;
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
+
+        if (vm.count("help")) {
+            std::cout << desc << std::endl;
+            return 0;
+        }
         
         boost::program_options::notify(vm);
         
         int N = vm["size"].as<int>();
         int threadAmount = vm["threads"].as<int>();
         
+        if (N <= 0 || threadAmount <= 0) {
+            std::cerr << "Error: Matrix size and thread count must be positive integers." << std::endl;
+            return 1;
+        }
+        
         auto duration = Multiplication(N, threadAmount);
         
-        std::cout << std::fixed << duration.count() << std::endl;
+        std::cout << "Execution time: " << std::fixed << duration.count() << " seconds" << std::endl;
     } catch (const boost::program_options::error &e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
